@@ -49,3 +49,22 @@ jobs:
           sleep 10
           docker ps
           docker-compose logs postgres
+
+      - name: Setup ngrok tunnel
+        run: |
+          # Install ngrok
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com jammy main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install -y ngrok
+
+          # Authenticate and start tunnel
+          ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
+          ngrok tcp 5432 --log=stdout > ngrok.log &
+          sleep 5  # Wait for tunnel to establish
+
+          # Display connection info
+          echo "Public URL:"
+          curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+
+      - name: Keep alive
+        run: sleep 300 # Keep runner alive for 5 minutes
