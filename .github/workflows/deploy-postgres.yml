@@ -1,0 +1,51 @@
+name: Deploy PostgreSQL with pgvector
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Create docker-compose.yml
+        run: |
+          cat > docker-compose.yml << 'EOL'
+          version: '3.8'
+
+          services:
+            postgres:
+              image: ankane/pgvector
+              container_name: postgres_db
+              environment:
+                POSTGRES_USER: postgres
+                POSTGRES_PASSWORD: postgres
+                POSTGRES_DB: postgres
+              ports:
+                - "5432:5432"
+              volumes:
+                - postgres_data:/var/lib/postgresql/data
+              restart: unless-stopped
+
+          volumes:
+            postgres_data:
+          EOL
+
+      - name: Deploy PostgreSQL
+        run: docker-compose up -d
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          docker ps
+          docker-compose logs postgres
