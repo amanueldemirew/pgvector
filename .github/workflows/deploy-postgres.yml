@@ -50,21 +50,18 @@ jobs:
           docker ps
           docker-compose logs postgres
 
-      - name: Setup ngrok tunnel
+      - name: Setup Cloudflared tunnel
         run: |
-          # Download and install ngrok directly
-          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-          tar xvzf ngrok-v3-stable-linux-amd64.tgz
-          chmod +x ./ngrok
+          # Install cloudflared
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
 
-          # Authenticate and start tunnel
-          ./ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
-          ./ngrok tcp 5432 --log=stdout > ngrok.log &
-          sleep 5  # Wait for tunnel to establish
+          # Start tunnel (no auth needed for basic tunnels)
+          cloudflared tunnel --url tcp://localhost:5432 > cloudflared.log 2>&1 &
+          sleep 5
 
-          # Display connection info
-          echo "Public URL:"
-          curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+          # Extract and display URL
+          grep -o 'https://.*\.trycloudflare.com' cloudflared.log | head -1
 
       - name: Keep alive
         run: sleep 300 # Keep runner alive for 5 minutes
