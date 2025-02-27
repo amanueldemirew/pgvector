@@ -1,4 +1,4 @@
-name: Deploy PostgreSQL with pgvector
+name: Deploy PostgreSQL with pgvector to Fly.io
 
 on:
   push:
@@ -13,55 +13,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Compose
+      - name: Install Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Create fly.toml
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
+          cat > fly.toml << 'EOL'
+          app = "amazing-postgres"
 
-      - name: Create docker-compose.yml
-        run: |
-          cat > docker-compose.yml << 'EOL'
-          version: '3.8'
+          [build]
+          image = "ankane/pgvector"
 
-          services:
-            postgres:
-              image: ankane/pgvector
-              container_name: postgres_db
-              environment:
-                POSTGRES_USER: postgres
-                POSTGRES_PASSWORD: postgres
-                POSTGRES_DB: postgres
-              ports:
-                - "5432:5432"
-              volumes:
-                - postgres_data:/var/lib/postgresql/data
-              restart: unless-stopped
+          [env]
+          POSTGRES_USER = "postgres"
+          POSTGRES_PASSWORD = "postgres" # You should use secrets for this
+          POSTGRES_DB = "postgres"
 
-          volumes:
-            postgres_data:
+          [mounts]
+          source = "postgres_data"
+          destination = "/var/lib/postgresql/data"
+
+          [http_service]
+            internal_port = 5432
+            force_https = true
+            auto_stop_machines = false
+            auto_start_machines = true
           EOL
 
-      - name: Deploy PostgreSQL
-        run: docker-compose up -d
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-      - name: Verify deployment
+      - name: Output connection information
         run: |
-          sleep 10
-          docker ps
-          docker-compose logs postgres
-
-      - name: Setup Cloudflared tunnel
-        run: |
-          # Install cloudflared
-          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared.deb
-
-          # Start tunnel (no auth needed for basic tunnels)
-          cloudflared tunnel --url tcp://localhost:5432 > cloudflared.log 2>&1 &
-          sleep 5
-
-          # Extract and display URL
-          grep -o 'https://.*\.trycloudflare.com' cloudflared.log | head -1
-
-      - name: Keep alive
-        run: sleep 300 # Keep runner alive for 5 minutes
+          echo "PostgreSQL deployed to Fly.io"
+          echo "Connection string: postgres://postgres:postgres@amazing-postgres.fly.dev:5432/postgres"
