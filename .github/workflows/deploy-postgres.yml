@@ -52,14 +52,14 @@ jobs:
 
       - name: Setup ngrok tunnel
         run: |
-          # Install ngrok
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com jammy main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt update && sudo apt install -y ngrok
+          # Download and install ngrok directly
+          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+          tar xvzf ngrok-v3-stable-linux-amd64.tgz
+          chmod +x ./ngrok
 
           # Authenticate and start tunnel
-          ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
-          ngrok tcp 5432 --log=stdout > ngrok.log &
+          ./ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
+          ./ngrok tcp 5432 --log=stdout > ngrok.log &
           sleep 5  # Wait for tunnel to establish
 
           # Display connection info
